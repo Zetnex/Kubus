@@ -1,0 +1,101 @@
+﻿program
+    : namespace imports classDef+ EOF
+    ;
+
+namespace
+    : 'ns' qualifiedName ';'
+    ;
+
+imports
+    : 'use' importList ';'
+    ;
+
+importList
+    : qualifiedName (',' qualifiedName)*
+    ;
+
+classDef
+    : qualifiedName ':' qualifiedName ('!' qualifiedName)? '{' member+ '}'
+    ;
+
+member
+    : property
+    | method
+    | constructor
+    ;
+
+property
+    : visibility ('st')? '$' ID ('=' expr)? ';'
+    ;
+
+visibility
+    : 'pu'
+    | 'pr'
+    | 'pt'
+    ;
+
+constructor
+    : '(' paramList? ')' block
+    ;
+
+method
+    : visibility ('st' | 'm')? ID '(' paramList? ')' (type)? block
+    ;
+
+paramList
+    : param (',' param)*
+    ;
+
+param
+    : '$' ID type
+    ;
+
+type
+    : ID
+    ;
+
+block
+    : '{' statement* '}'
+    ;
+
+statement
+    : assignment
+    | returnStmt
+    | ifStmt
+    | expr ';'
+    ;
+
+assignment
+    : variable '=' expr ';'
+    ;
+
+returnStmt
+    : 're' expr ';'
+    ;
+
+ifStmt
+    : 'if' '(' expr ')' block
+    ;
+
+expr
+    : literal                                                  # LiteralExpr
+    | variable                                                 # VariableExpr
+    | expr ('++' | '--')                                       # PostfixExpr
+    | 'new' qualifiedName '(' (expr (',' expr)*)? ')'          # NewExpr
+    | expr '.' ID '(' (expr (',' expr)*)? ')'                  # MethodCallExpr
+    | ID '(' (expr (',' expr)*)? ')'                           # FunctionCallExpr
+    | '(' expr ')'                                             # ParenExpr
+    ;
+
+literal
+    : NUMBER
+    | STRING
+    ;
+
+variable
+    : ('$$$' | '$$' | '$') ID
+    ;
+
+qualifiedName
+    : ID ('\\' ID)*
+    ;

@@ -1,0 +1,45 @@
+﻿ns This\Is\Code;
+
+use
+    This\Is\Code\BasicClass,
+    This\Is\Code\BasicClass2;
+    
+ChildClass : ParentClass ! Interface {
+
+    pr $name;
+    pt $counter = 0;
+    pu st $instanceCount = 0;
+    
+    // Constructor
+    ($name string) {
+        $$name = $name;
+        $$$instanceCount++;
+        $$counter++;
+        
+        $class = new ExampleClass();
+        $class.run();
+    }
+    
+    pu getName() string {
+        re $name;
+    }
+    
+    pu setName($name string) {
+        if(empty($name)) {
+            re new Exception("Name cannot be empty");
+        }
+        $$name = $name;
+    }
+    
+    pu st getInstanceCount() int {
+        re $$$instanceCount;
+    }
+    
+    pu getInfo() str {
+        re "Name: $$name, Counter: $$counter, Instance Count: $$$instanceCount";
+    }
+    
+    pu m toString() str {
+        re $$getInfo();
+    }
+}

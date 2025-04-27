@@ -1,0 +1,11 @@
+﻿ns This\Is\A\Test;
+
+TestClass {
+
+    pr str $secret = "Hi";
+
+    ($secret str) {
+        $$secret = $secret;
+    }
+
+}
