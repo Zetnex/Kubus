@@ -63,6 +63,15 @@ public class Parser
     {
         return Consume("identifier", "Expected identifier").Value;
     }
+    
+    private List<string> ParseQualifiedNameList()
+    {
+        var names = new List<string>();
+        do {
+            names.Add(ParseQualifiedName());
+        } while (Match("comma"));
+        return names;
+    }
 
     private ClassNode ParseClass()
     {
@@ -121,26 +130,50 @@ public class Parser
 
             return ParseMethod(visibility, isStatic, isMethodModifier);
         }
+
+        if (Check("identifier") && Peek(1).Type == "open_paren")
+        {
+            throw new Exception("Missing visibility on function definition");
+        }
+
+        // TraitUsageStatement
+        if (Check("use"))
+        {
+            Consume("use");
+            var traitNames = ParseQualifiedNameList();
+            Consume("semicolon", "Expected ';' after trait usage");
+            return new TraitUsageStatementNode(traitNames);
+        }
+
+        throw new Exception("Unknown class member");
+        
         return null;
     }
     
     private bool CheckDatatype()
     {
-        return Check("int") || Check("float") || Check("string") || Check("bool") || Check("void") || Check("char");
+        return Check("int") || Check("float") || Check("string") || Check("bool") || Check("void") || Check("char") ||
+               (Check("identifier") && Peek(1).Type != "open_paren");
     }
 
     private ConstructorNode ParseConstructor()
     {
         var parameters = ParseParamList();
+        Consume("close_paren", "Expected ')' after parameters");
         var block = ParseBlock();
         return new ConstructorNode(parameters, block);
     }
 
     private PropertyNode ParseProperty(string visibility, bool isStatic)
     {
+        Token type;
         if (CheckDatatype())
         {
-            Consume();
+            type = Consume();
+        }
+        else
+        {
+            throw new Exception("Datatypes are required on properties");
         }
         
         Consume("variable_sign", "Expected '$' before property name");
@@ -153,7 +186,7 @@ public class Parser
         }
         
         Consume("semicolon", "Expected ';' after property");
-        return new PropertyNode(visibility, isStatic, name, initialValue);
+        return new PropertyNode(visibility, type, isStatic, name, initialValue);
     }
 
     private MethodNode ParseMethod(string visibility, bool isStatic, bool isMethod)
@@ -164,9 +197,9 @@ public class Parser
         Consume("close_paren", "Expected ')' after parameters");
 
         string? returnType = null;
-        if (Check("identifier"))
+        if (CheckDatatype())
         {
-            returnType = Consume("identifier", "Expected return type").Value;
+            returnType = Consume().Value;
         }
 
         var block = ParseBlock();
@@ -182,7 +215,6 @@ public class Parser
                 parameters.Add(ParseParameter());
             } while (Match("comma"));
         }
-        Consume("close_paren", "Expected ')' after parameter list");
         return parameters;
     }
 
@@ -492,6 +524,16 @@ public class Parser
     private Token Peek()
     {
         return _tokens[_position];
+    }
+
+    public Token Peek(int depth)
+    {
+        if (_position + depth > _tokens.Length)
+        {
+            return _tokens[^1];
+        }
+
+        return _tokens[_position + depth];
     }
 
     private Token Previous()

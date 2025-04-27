@@ -1,0 +1,19 @@
+﻿ns DerCooleVonDem\ZetNexHealth;
+
+use DerCooleVonDem\ZetNexHealth\ZetNexHealth,
+    DerCooleVonDem\ZetNexHealth\ZetNexHealth\ZetNexHealth;
+
+ZetNexHealth : PluginBase {
+
+    pu int $a = 1;
+    pu int $b = 2;
+
+    ($d int) {
+        $c = $$a + $$b;
+        $e = $c + $d;
+    }
+
+    pt onEnable() {
+
+    }
+}
