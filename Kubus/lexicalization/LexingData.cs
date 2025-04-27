@@ -18,6 +18,7 @@ public class LexingData
         Define("re", "return", TypeGroup.Keyword, lexer);
         Define("new", "new", TypeGroup.Keyword, lexer);
         Define("m", "magic", TypeGroup.Keyword, lexer);
+        Define("cst", "const", TypeGroup.Keyword, lexer);
         
         // data types
         Define("int", "int", TypeGroup.Keyword, lexer);
@@ -27,17 +28,18 @@ public class LexingData
         Define("bool", "bool", TypeGroup.Keyword, lexer);
         Define("void", "void", TypeGroup.Keyword, lexer);
         
+        // literals
+        Define("\"([^\"\\\\]|\\\\.)*\"", "string", TypeGroup.Literal, lexer);
+        Define("'([^'\\\\]|\\\\.)*'", "char", TypeGroup.Literal, lexer);
+        Define("[0-9]+", "integer", TypeGroup.Literal, lexer);
+        Define("[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?", "float", TypeGroup.Literal, lexer);
+        Define("true|false", "boolean", TypeGroup.Literal, lexer);
+        
         // identifiers
         Define("[a-zA-Z_][a-zA-Z0-9_]*", "identifier", TypeGroup.Identifier, lexer);
 
         // namespace definition
         Define("([a-zA-Z_][a-zA-Z0-9_]*\\\\)+[a-zA-Z_][a-zA-Z0-9_]*", "namespace_definition", TypeGroup.Identifier, lexer);
-        
-        // literals
-        Define("\"([^\"\\\\]|\\\\.)*\"", "string", TypeGroup.Literal, lexer);
-        Define("'([^'\\\\]|\\\\.)*'", "char", TypeGroup.Literal, lexer);
-        Define("[0-9]+", "integer", TypeGroup.Literal, lexer);
-        Define("[0-9]+\\.[0-9]+", "float", TypeGroup.Literal, lexer);
         
         // operators
         Define("\\+", "plus", TypeGroup.Operator, lexer); 
@@ -47,6 +49,11 @@ public class LexingData
         Define("%", "modulus", TypeGroup.Operator, lexer);
         Define("=", "assign", TypeGroup.Operator, lexer);
         Define("==", "equal", TypeGroup.Operator, lexer);
+        Define("!=", "not_equal", TypeGroup.Operator, lexer);
+        Define(">", "greater", TypeGroup.Operator, lexer);
+        Define(">=", "greater_equal", TypeGroup.Operator, lexer);
+        Define("<", "less", TypeGroup.Operator, lexer);
+        Define("<=", "less_equal", TypeGroup.Operator, lexer);
         Define("\\+\\+", "increment", TypeGroup.Operator, lexer);
         Define("--", "decrement", TypeGroup.Operator, lexer);
         

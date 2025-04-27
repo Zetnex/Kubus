@@ -4,6 +4,7 @@ using Kubus.transpilation;
 
 class Program
 {
+    
     public static void Main(string[] args)
     {
         if(args.Length == 0)
@@ -37,9 +38,18 @@ class Program
         
         // filter out comments
         tokens = tokens.Where(t => t.Type != "single_line_comment" && t.Type != "multi_line_comment").ToArray();
-        
-        Parser parser = new Parser(tokens);
-        Ast ast = parser.Parse();
+
+        Ast? ast;
+        //try
+        //{
+            Parser parser = new Parser(tokens);
+            ast = parser.Parse();
+        //}
+        //catch (Exception e)
+        //{
+        //    Console.WriteLine(e.Message);
+        //    throw;
+        //}
         
         // transpile to PHP
         Transpiler transpiler = new Transpiler(ast);

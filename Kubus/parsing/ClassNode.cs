@@ -6,6 +6,7 @@ public class ClassNode : AstNode
     public string Parent { get; }
     public string? Interface { get; }
     public List<AstNode> Members { get; } = new();
+    public List<ConstantNode> Constants { get; } = new List<ConstantNode>();
 
     public ClassNode(string name, string parent, string? @interface) : base("Class")
     {
@@ -17,5 +18,10 @@ public class ClassNode : AstNode
     public void AddMember(AstNode member)
     {
         Members.Add(member);
+    }
+    
+    public void AddConstant(ConstantNode constant)
+    {
+        Constants.Add(constant);
     }
 }

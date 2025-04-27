@@ -1,19 +1,16 @@
-﻿ns DerCooleVonDem\ZetNexHealth;
+﻿ns DerCooleVonDem\StructureTool\command\subCommands;
 
-use DerCooleVonDem\ZetNexHealth\ZetNexHealth,
-    DerCooleVonDem\ZetNexHealth\ZetNexHealth\ZetNexHealth;
+use DerCooleVonDem\ZetNexHealth\command\HealthSubCommand,
+    pocketmine\command\CommandSender;
 
-ZetNexHealth : PluginBase {
+TestSubCommand : HealthSubCommand {
 
-    pu int $a = 1;
-    pu int $b = 2;
-
-    ($d int) {
-        $c = $$a + $$b;
-        $e = $c + $d;
+    () {
+        parent.__construct("test", "Oh noes, there is a test sub remaining!");
     }
 
-    pt onEnable() {
-
+    pu execute($sender CommandSender, $args array) {
+        $sender.sendMessage("Test");
     }
+
 }

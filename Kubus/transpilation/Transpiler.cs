@@ -75,6 +75,11 @@ public class Transpiler
         output.AppendLine($"class {node.Name}{(hasInheritance ? $" extends {node.Parent}" : "")}{(hasImplements ? $" implements {node.Interface}" : "")} {{");
         
         _indentation.IncreaseIndent();
+        foreach (var constant in node.Constants)
+        {
+            output.AppendLine(_indentation.ApplyIndent(TranspileConstant(constant)));
+        }
+        
         foreach (var member in node.Members)
         {
             output.AppendLine(_indentation.ApplyIndent(TranspileMember(member)));
@@ -84,6 +89,15 @@ public class Transpiler
         output.AppendLine("}");
         
         return output.ToString();
+    }
+
+    private string TranspileConstant(ConstantNode constant)
+    {
+        var visibility = constant.Visibility.ToLower() + " ";
+        var name = constant.Name;
+        var value = $" = {TranspileExpression(constant.Value)}";
+
+        return $"{visibility}const {name}{value};";
     }
 
     private string TranspileMember(AstNode member)
@@ -151,10 +165,10 @@ public class Transpiler
         return output.ToString();
     }
 
-    private string? TranspileBody(BlockNode memberBody)
+    private string TranspileBody(BlockNode memberBody)
     {
         var output = new StringBuilder();
-        
+
         foreach (var statement in memberBody.Statements)
         {
             output.AppendLine(_indentation.ApplyIndent(TranspileStatement(statement)));
@@ -169,9 +183,53 @@ public class Transpiler
         {
             case "VariableDeclaration":
                 return TranspileVariableDeclaration((VariableDeclarationNode)statement);
+            case "ReturnStatement":
+                return TranspileReturnStatement((ReturnStatementNode)statement);
+            case "ExpressionStatement":
+                return TranspileExpression(((ExpressionStatementNode)statement).Expression) + ";";
+            case "IfStatement":
+                return TranspileIfStatement((IfStatementNode)statement);
             default:
                 return statement.NodeType + " is not implemented yet.";
         }
+    }
+
+    private string TranspileIfStatement(IfStatementNode statement)
+    {
+        var condition = TranspileExpression(statement.Condition);
+        var output = new StringBuilder();
+        output.AppendLine($"if ({condition}) {{");
+    
+        _indentation.IncreaseIndent();
+        var thenBlock = TranspileBody(statement.ThenBlock);
+        if (thenBlock != "")
+        {
+            output.AppendLine(thenBlock);
+        }
+        _indentation.DecreaseIndent();
+    
+        output.Append(_indentation.ApplyIndent("}"));
+
+        if (statement.ElseBlock != null)
+        {
+            output.AppendLine(" else {");
+            _indentation.IncreaseIndent();
+            var elseBlock = TranspileBody(statement.ElseBlock);
+            if (elseBlock != "")
+            {
+                output.AppendLine(elseBlock);
+            }
+            _indentation.DecreaseIndent();
+            output.AppendLine(_indentation.ApplyIndent("}"));
+        }
+
+        return output.ToString().TrimEnd();
+    }
+
+    private string TranspileReturnStatement(ReturnStatementNode statement)
+    {
+        var returnValue = TranspileExpression(statement.ReturnValue);
+        return $"return {returnValue};";
     }
 
     private string TranspileVariableDeclaration(VariableDeclarationNode statement)
@@ -203,18 +261,103 @@ public class Transpiler
         switch (expression.NodeType)
         {
             case "LiteralExpression":
-                return TranspileLiteralExpression((LiteralExpressionNode)expression);
-            case "BinaryExpression":
-                return TranspileBinaryExpression((BinaryExpressionNode)expression);
+                var literal = (LiteralExpressionNode)expression;
+                return literal.Value.Type switch
+                {
+                    "string" => $"{literal.Value.Value}",
+                    "boolean" => literal.Value.Value.ToLower(),
+                    _ => literal.Value.Value
+                };
             case "LocalVariable":
                 return "$" + ((LocalVariableNode)expression).Name;
             case "ObjectProperty":
                 return "$this->" + ((ObjectProprertyNode)expression).PropertyName;
             case "StaticProperty":
                 return "self::$" + ((StaticPropertyNode)expression).PropertyName;
+            case "FunctionCall":
+                return TranspileFunctionCall((FunctionCallNode)expression);
+            case "ConstantAccess":
+                return "self::" + ((ConstantAccessNode)expression).Name;
+            case "ClassName":
+                return ((ClassNameNode)expression).Name;
+            case "This":
+                return "$this";
+            case "MethodCallChain":
+                return TranspileMethodCallChain((MethodCallChainNode)expression);
             default:
-                return expression.NodeType;
+                throw new Exception($"Unknown expression node type: {expression.NodeType}");
         }
+    }
+
+    private string TranspileMethodCallChain(MethodCallChainNode expression)
+    {
+        var output = new StringBuilder();
+        
+        // Transpile the receiver
+        if (expression.Receiver is ThisNode)
+        {
+            output.Append("$this");
+        }
+        else if (expression.Receiver is ClassNameNode className)
+        {
+            output.Append(className.Name);
+        }
+        else if (expression.Receiver is LocalVariableNode variable)
+        {
+            output.Append("$" + variable.Name);
+        }
+        else
+        {
+            output.Append(TranspileExpression(expression.Receiver));
+        }
+
+        // Transpile each method call
+        bool isFirstCall = true;
+        foreach (var (methodName, arguments) in expression.Calls)
+        {
+            if (expression.Receiver is ClassNameNode && isFirstCall)
+            {
+                output.Append("::"); // Static call, e.g., Logger::getInstance
+            }
+            else
+            {
+                output.Append("->"); // Instance call, e.g., ->info
+            }
+            
+            output.Append(methodName);
+            output.Append("(");
+            var argStrings = arguments.Select(arg => TranspileExpression(arg));
+            output.Append(string.Join(", ", argStrings));
+            output.Append(")");
+            
+            isFirstCall = false;
+        }
+
+        return output.ToString();
+    }
+
+    private string TranspileStaticFunctionCall(StaticFunctionCallNode expression)
+    {
+        var functionName = expression.FunctionName;
+        var arguments = new List<string>();
+        
+        foreach (var argument in expression.Arguments)
+        {
+            arguments.Add(TranspileExpression(argument));
+        }
+
+        return $"self::{functionName}({string.Join(", ", arguments)})";
+    }
+
+    private string TranspileFunctionCall(FunctionCallNode functionCall)
+    {
+        var output = new StringBuilder();
+        output.Append(functionCall.FunctionName);
+        output.Append("(");
+        var argStrings = functionCall.Arguments.Select(arg => TranspileExpression(arg));
+        output.Append(string.Join(", ", argStrings));
+        output.Append(")");
+        return output.ToString();
     }
 
     private string TranspileBinaryExpression(BinaryExpressionNode expression)
