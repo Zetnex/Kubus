@@ -272,7 +272,7 @@ public class Parser
     {
         var expr = ParseEquality();
 
-        while (Match("dot"))
+        while (Match("dotdot"))
         {
             var operatorToken = Previous();
             var right = ParseEquality();
@@ -352,88 +352,35 @@ public class Parser
         if (Check("identifier"))
         {
             var identifier = Consume("identifier", "Expected identifier").Value;
-            if (Peek().Type == "open_paren")
+
+            if (Check("open_paren"))
             {
-                var functionCall = ParseFunctionCall(identifier);
-                if (Match("dot"))
-                {
-                    // Start of method call chain, e.g., getLogger().info("")
-                    var receiver = new ThisNode(); // Assume $this
-                    var calls = new List<(string, List<ExpressionNode>)> { (identifier, functionCall.Arguments) };
-                    // Parse the immediate method call after the dot
-                    if (Check("identifier") && Peek(1).Type == "open_paren")
-                    {
-                        var methodName = Consume("identifier", "Expected method name").Value;
-                        var methodCall = ParseFunctionCall(methodName);
-                        calls.Add((methodName, methodCall.Arguments));
-                    }
-                    else
-                    {
-                        throw new Exception("Expected method call after '.'");
-                    }
-                    return ParseMethodCallChain(receiver, calls); // Handle additional dots
-                }
-                // Standalone method call, e.g., saveDefaultConfig()
-                return new MethodCallChainNode(new ThisNode(), new List<(string, List<ExpressionNode>)> { (identifier, functionCall.Arguments) });
-            }
-            if (Peek().Type == "dot")
-            {
-                // Static method call, e.g., Logger.getInstance()
-                Consume("dot", "Expected '.' after class name");
-                var receiver = new ClassNameNode(identifier);
-                var calls = new List<(string, List<ExpressionNode>)>();
-                if (Check("identifier") && Peek(1).Type == "open_paren")
-                {
-                    var methodName = Consume("identifier", "Expected method name").Value;
-                    var methodCall = ParseFunctionCall(methodName);
-                    calls.Add((methodName, methodCall.Arguments));
-                }
-                else
-                {
-                    throw new Exception("Expected method call after '.'");
-                }
-                return ParseMethodCallChain(receiver, calls);
+                // Parse a function call
+                var arguments = ParseArguments();
+                return new FunctionCallNode(identifier, arguments);
             }
             
-            // Constant or standalone identifier, e.g., DEBUG
+            if (Peek().Type == "dot")
+            {
+                return ParseChain(new ClassNameNode(identifier)); // Static context
+            }
+            // Handle other cases (e.g., standalone identifier)
             return new ConstantAccessNode(identifier);
         }
 
-        if (Match("variable_sign"))
+        if (Match("variable_sign")) // '$' for variables
         {
             string variableName = Consume("identifier", "Expected variable name after '$'").Value;
-            if (Match("dot"))
+            if (Peek().Type == "dot")
             {
-                var receiver = new LocalVariableNode(variableName);
-                var calls = new List<(string, List<ExpressionNode>)>();
-                if (Check("identifier") && Peek(1).Type == "open_paren")
-                {
-                    string methodName = Consume("identifier", "Expected method name").Value;
-                    var methodCall = ParseFunctionCall(methodName);
-                    calls.Add((methodName, methodCall.Arguments));
-                }
-                else
-                {
-                    throw new Exception("Expected method call after '.'");
-                }
-                return ParseMethodCallChain(receiver, calls);
+                return ParseChain(new LocalVariableNode(variableName)); // Instance context
             }
+            
             return new LocalVariableNode(variableName);
         }
 
-        if (Match("local_variable_sign"))
-        {
-            string variableName = Consume("identifier", "Expected variable name after '$'").Value;
-            return new ObjectProprertyNode(variableName); // Corrected typo: ObjectProprertyNode -> ObjectPropertyNode
-        }
-        
-        if (Match("static_local_variable_sign"))
-        {
-            string variableName = Consume("identifier", "Expected variable name after '$'").Value;
-            return new StaticPropertyNode(variableName);
-        }
-
-        if (Match("integer") || Match("float") || Match("string") || Match("char") || Match("boolean"))
+        // Other cases (literals, grouping, new, etc.) remain unchanged
+        if (Match("integer") || Match("float") || Match("string") || Match("sq_string") || Match("char") || Match("boolean"))
         {
             return new LiteralExpressionNode(Previous());
         }
@@ -445,11 +392,96 @@ public class Parser
             return new GroupingExpressionNode(expr);
         }
 
-        // Debugging: Log unexpected token
-        Console.WriteLine($"Unexpected token in ParsePrimary: Type={Peek().Type}, Value={Peek().Value}, Line={Peek().Position.Line}, Column={Peek().Position.Column}");
-        throw new Exception("Expected expression");
-    }
+        if (Match("open_bracket"))
+        {
+            // array
+            var elements = new List<ExpressionNode>();
+            if (!Check("close_bracket"))
+            {
+                do
+                {
+                    elements.Add(ParseExpr());
+                } while (Match("comma"));
+            }
+            Consume("close_bracket", "Expected ']' after array elements");
+            return new ArrayExpressionNode(elements);
+        }
 
+        if (Match("new"))
+        {
+            var className = Consume("identifier", "Expected class name after 'new'").Value;
+            Consume("open_paren", "Expected '(' after class name");
+            var arguments = new List<ExpressionNode>();
+            if (!Check("close_paren"))
+            {
+                do
+                {
+                    arguments.Add(ParseExpr());
+                } while (Match("comma"));
+            }
+            Consume("close_paren", "Expected ')' after constructor arguments");
+            return new NewExpressionNode(className, arguments);
+        }
+
+        throw new Exception($"Unexpected token in ParsePrimary: {Peek().Type}");
+    }
+    
+    private ExpressionNode ParseChain(ExpressionNode receiver)
+    {
+        while (Match("dot"))
+        {
+            if (Check("identifier"))
+            {
+                var identifier = Consume("identifier", "Expected identifier after '.'").Value;
+                if (Peek().Type == "open_paren")
+                {
+                    // Parse a method call
+                    var arguments = ParseArguments(); // Assume this consumes '(' and parses args
+                    if (receiver is ClassNameNode classNameNode)
+                    {
+                        receiver = new StaticMethodCallNode(classNameNode.Name, identifier, arguments);
+                    }
+                    else
+                    {
+                        receiver = new InstanceMethodCallNode(receiver, identifier, arguments);
+                    }
+                }
+                else
+                {
+                    // Parse a property access
+                    if (receiver is ClassNameNode classNameNode)
+                    {
+                        receiver = new StaticPropertyAccessNode(classNameNode.Name, identifier);
+                    }
+                    else
+                    {
+                        receiver = new PropertyAccessNode(receiver, identifier);
+                    }
+                }
+            }
+            else
+            {
+                throw new Exception("Expected identifier after '.'");
+            }
+        }
+        return receiver;
+    }
+    
+    private List<ExpressionNode> ParseArguments()
+    {
+        Consume("open_paren", "Expected '(' after method name");
+        var arguments = new List<ExpressionNode>();
+        if (!Check("close_paren"))
+        {
+            do
+            {
+                arguments.Add(ParseExpr());
+            } while (Match("comma"));
+        }
+        Consume("close_paren", "Expected ')' after arguments");
+        return arguments;
+    }
+    
     private MethodCallChainNode ParseMethodCallChain(ExpressionNode receiver, List<(string, List<ExpressionNode>)> calls)
     {
         while (Match("dot"))
@@ -507,7 +539,8 @@ public class Parser
     private StatementNode ParseStatement()
     {
         if (Check("variable_sign") && Peek(1).Type == "identifier" && 
-            (Peek(2).Type == "assign" || Peek(2).Type == "increment" || Peek(2).Type == "decrement"))
+            (Peek(2).Type == "assign" || Peek(2).Type == "increment" || Peek(2).Type == "decrement" || 
+             Peek(2).Type == "open_bracket"))
         {
             Consume("variable_sign"); // Now consume $ after checking
             return ParseVariableDeclaration();
@@ -533,7 +566,24 @@ public class Parser
             return ParseIf();
         }
 
+        if (Match("foreach"))
+        {
+            return ParseForeach();
+        }
+        
         return ParseExpressionStatement();
+    }
+
+    private StatementNode ParseForeach()
+    {
+        Consume("open_paren", "Expected '(' after 'foreach'");
+        var iterator = ParseExpr();
+        Consume("colon", "Expected ':' after iterator");
+        var collection = ParseExpr();
+        Consume("close_paren", "Expected ')' after 'foreach'");
+
+        var block = ParseBlock();
+        return new ForeachStatementNode(iterator, collection, block);
     }
 
     private StatementNode ParseIf()
@@ -611,6 +661,26 @@ public class Parser
     {
         var name = Consume("identifier", "Expected variable name").Value;
     
+        // check if it is an array append
+        if (Match("open_bracket"))
+        {
+            if (Peek().Type == "close_bracket")
+            {
+                Consume("close_bracket", "I saw a close bracket but then it vanished. Mistery unlocked!");
+                Consume("assign", "Expected '=' after variable name");
+                var initial = ParseExpr();
+                Consume("semicolon", "Expected ';' after variable declaration");
+                return new ArrayAppendNode(name, null, initial);
+            }
+            
+            var index = ParseExpr();
+            Consume("close_bracket", "Expected ']' after array index");
+            Consume("assign", "Expected '=' after variable name");
+            var init = ParseExpr();
+            Consume("semicolon", "Expected ';' after variable declaration");
+            return new ArrayAppendNode(name, index, init);
+        }
+        
         if (Check("increment"))
         {
             Consume("increment", "Expected '++' after variable name");

@@ -9,7 +9,7 @@ class Program
     {
         if(args.Length == 0)
         {
-            Console.WriteLine("Please provide a source file.");
+            Console.WriteLine("Please provide a source file or folder.");
             return;
         }
      

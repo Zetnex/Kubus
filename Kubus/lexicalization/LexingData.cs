@@ -19,6 +19,7 @@ public class LexingData
         Define("new", "new", TypeGroup.Keyword, lexer);
         Define("m", "magic", TypeGroup.Keyword, lexer);
         Define("cst", "const", TypeGroup.Keyword, lexer);
+        Define("fre", "foreach", TypeGroup.Keyword, lexer);
         
         // data types
         Define("int", "int", TypeGroup.Keyword, lexer);
@@ -30,6 +31,8 @@ public class LexingData
         
         // literals
         Define("\"([^\"\\\\]|\\\\.)*\"", "string", TypeGroup.Literal, lexer);
+        // single quote string
+        Define("'([^'\\\\]|\\\\.)*'", "sq_string", TypeGroup.Literal, lexer);
         Define("'([^'\\\\]|\\\\.)*'", "char", TypeGroup.Literal, lexer);
         Define("[0-9]+", "integer", TypeGroup.Literal, lexer);
         Define("[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?", "float", TypeGroup.Literal, lexer);
@@ -75,6 +78,7 @@ public class LexingData
         
         // punctuation
         Define("\\.", "dot", TypeGroup.Punctuation, lexer);
+        Define("\\.\\.", "dotdot", TypeGroup.Punctuation, lexer);
         Define(",", "comma", TypeGroup.Punctuation, lexer);
         Define(":", "colon", TypeGroup.Punctuation, lexer);
         Define("!", "exclamation", TypeGroup.Punctuation, lexer);

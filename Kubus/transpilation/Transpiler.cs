@@ -29,9 +29,7 @@ public class Transpiler
         if(imports != "") output.AppendLine(imports);
         
         var classes = FollowedByNewLine(TranspileClasses(_ast.Classes));
-        if(classes != "") output.AppendLine(classes);
-        
-        // Todo: Add more transpilation logic here
+        if (classes != "") output.AppendLine(classes);
 
         return output.ToString().Trim();
     }
@@ -112,6 +110,8 @@ public class Transpiler
                 return TranspileConstructor((ConstructorNode)member);
             case "Method":
                 return TranspileMethod((MethodNode)member);
+            case "TraitUsage":
+                return TranspileTraitUsageStatement((TraitUsageStatementNode)member);
             default:
                 return member.NodeType + " is not implemented yet.";
         }
@@ -183,15 +183,53 @@ public class Transpiler
         {
             case "VariableDeclaration":
                 return TranspileVariableDeclaration((VariableDeclarationNode)statement);
+            case "ArrayAppend":
+                return TranspileArrayAppend((ArrayAppendNode)statement);
             case "ReturnStatement":
                 return TranspileReturnStatement((ReturnStatementNode)statement);
             case "ExpressionStatement":
                 return TranspileExpression(((ExpressionStatementNode)statement).Expression) + ";";
             case "IfStatement":
                 return TranspileIfStatement((IfStatementNode)statement);
+            case "ForeachStatement":
+                return TranspileForeachStatement((ForeachStatementNode)statement);
             default:
                 return statement.NodeType + " is not implemented yet.";
         }
+    }
+
+    private string TranspileArrayAppend(ArrayAppendNode statement)
+    {
+        var arrayName = "$" + statement.Name;
+        var value = TranspileExpression(statement.Value);
+        return $"{arrayName}[] = {value};";
+    }
+
+    private string TranspileForeachStatement(ForeachStatementNode statement)
+    {
+        var collection = TranspileExpression(statement.Collection);
+        var itemName = TranspileExpression(statement.Iterator);
+        var output = new StringBuilder();
+        output.AppendLine($"foreach ({collection} as {itemName}) {{");
+        
+        _indentation.IncreaseIndent();
+        var body = TranspileBody(statement.Block);
+        if (body != "")
+        {
+            output.AppendLine(body);
+        }
+        _indentation.DecreaseIndent();
+        
+        output.Append(_indentation.ApplyIndent("}"));
+        
+        return output.ToString().TrimEnd();
+    }
+
+    private string TranspileTraitUsageStatement(TraitUsageStatementNode statement)
+    {
+        var output = new StringBuilder();
+        output.Append("use " + string.Join(", ", statement.Traits) + ";");
+        return output.ToString();
     }
 
     private string TranspileIfStatement(IfStatementNode statement)
@@ -260,6 +298,7 @@ public class Transpiler
     {
         switch (expression.NodeType)
         {
+            // Existing cases...
             case "LiteralExpression":
                 var literal = (LiteralExpressionNode)expression;
                 return literal.Value.Type switch
@@ -284,9 +323,110 @@ public class Transpiler
                 return "$this";
             case "MethodCallChain":
                 return TranspileMethodCallChain((MethodCallChainNode)expression);
+            case "NewExpression":
+                return TranspileNewExpression((NewExpressionNode)expression);
+            case "BinaryExpression":
+                return TranspileBinaryExpression((BinaryExpressionNode)expression);
+            case "UnaryExpression":
+                return TranspileUnaryExpression((UnaryExpressionNode)expression);
+            case "ConcatExpression":
+                return TranspileConcatExpression((ConcatExpressionNode)expression);
+            case "GroupingExpression":
+                return TranspileGroupingExpression((GroupingExpressionNode)expression);
+            case "InstanceMethodCall":
+                return TranspileInstanceMethodCall((InstanceMethodCallNode)expression);
+            case "StaticMethodCall":
+                return TranspileStaticMethodCall((StaticMethodCallNode)expression);
+            case "StaticPropertyAccess":
+                return TranspileStaticPropertyAccess((StaticPropertyAccessNode)expression);
+            case "ArrayExpression":
+                return TranspileArrayExpression((ArrayExpressionNode)expression);
             default:
                 throw new Exception($"Unknown expression node type: {expression.NodeType}");
         }
+    }
+
+    private string TranspileArrayExpression(ArrayExpressionNode expression)
+    {
+        var elements = expression.Elements.Select(TranspileExpression);
+        return $"[{string.Join(", ", elements)}]";
+    }
+
+    private string TranspileStaticPropertyAccess(StaticPropertyAccessNode node)
+    {
+        // Get the class name (e.g., StructureScaffoldingGenerator)
+        var className = node.ClassName;
+    
+        // Get the property name (e.g., class)
+        var propertyName = node.PropertyName;
+    
+        // Combine into PHP syntax: ClassName::propertyName
+        return $"{className}::{propertyName}";
+    }
+    
+    private string TranspileStaticMethodCall(StaticMethodCallNode node)
+    {
+        // Get the class name (e.g., Profiler)
+        var className = node.ClassName;
+    
+        // Get the method name
+        var methodName = node.MethodName;
+    
+        // Transpile each argument and join them with commas
+        var arguments = string.Join(", ", node.Arguments.Select(TranspileExpression));
+    
+        // Combine into PHP syntax: ClassName::methodName($args)
+        return $"{className}::{methodName}({arguments})";
+    }
+    
+    private string TranspileInstanceMethodCall(InstanceMethodCallNode node)
+    {
+        // Transpile the receiver (e.g., the object like $obj)
+        var receiver = TranspileExpression(node.Receiver);
+    
+        // Get the method name
+        var methodName = node.MethodName;
+    
+        // Transpile each argument and join them with commas
+        var arguments = string.Join(", ", node.Arguments.Select(TranspileExpression));
+    
+        // Combine into PHP syntax: $receiver->methodName($args)
+        return $"{receiver}->{methodName}({arguments})";
+    }
+    
+    private string TranspileGroupingExpression(GroupingExpressionNode expression)
+    {
+        var innerExpression = TranspileExpression(expression.Expression);
+        return $"({innerExpression})";
+    }
+    
+    private string TranspileConcatExpression(ConcatExpressionNode expression)
+    {
+        var left = TranspileExpression(expression.Left);
+        var right = TranspileExpression(expression.Right);
+
+        return $"{left} . {right}";
+    }
+
+    private string TranspileUnaryExpression(UnaryExpressionNode expression)
+    {
+        var @operator = expression.Operator.Value;
+        var operand = TranspileExpression(expression.Operand);
+
+        return $"{@operator}{operand}";
+    }
+
+    private string TranspileNewExpression(NewExpressionNode expression)
+    {
+        var className = expression.TypeName;
+        var arguments = new List<string>();
+        
+        foreach (var argument in expression.Arguments)
+        {
+            arguments.Add(TranspileExpression(argument));
+        }
+
+        return $"new {className}({string.Join(", ", arguments)})";
     }
 
     private string TranspileMethodCallChain(MethodCallChainNode expression)

@@ -1,16 +1,52 @@
-﻿ns DerCooleVonDem\StructureTool\command\subCommands;
+﻿ns DerCooleVonDem\StructureTool\utils;
 
-use DerCooleVonDem\ZetNexHealth\command\HealthSubCommand,
-    pocketmine\command\CommandSender;
+use DerCooleVonDem\StructureTool\generator\StructureScaffoldingGenerator,
+    DerCooleVonDem\ZetNexHealth\performance\Profiler,
+    pocketmine\math\Vector3,
+    pocketmine\Server,
+    pocketmine\utils\SingletonTrait,
+    pocketmine\world\World,
+    pocketmine\world\WorldCreationOptions;
 
-TestSubCommand : HealthSubCommand {
+WorldUtils {
+    use SingletonTrait;
 
-    () {
-        parent.__construct("test", "Oh noes, there is a test sub remaining!");
+    pu createEditorWord($structureName string) World {
+        Profiler.getInstance().startMeasure("worldutils_createditorworld");
+        $worldManager = Server.getInstance().getWorldManager();
+        $options = new WorldCreationOptions();
+        $options.setGenratorClass(StructureScaffoldingGenerator.class);
+        $options.setSpawnPoint(new Vector3(0, 1, 0));
+        $worldManager.generateWorld($structureName .. "-editor", $options);
+        $worldManager.loadWorld($structureName .. "-editor");
+        Profiler.getInstance().stopMeasure("worldutils_createditorworld");
+        re $worldManager.getWorldByName($structureName .. "-editor");
     }
 
-    pu execute($sender CommandSender, $args array) {
-        $sender.sendMessage("Test");
+    pu doesWorldFolderExist($folderName string) bool {
+        $path = Server.getInstance().getDataPath() .. "worlds/" .. $folderName;
+        if (is_dir($path)) {
+            re true;
+        }
+        re false;
     }
 
+    pu getAllEditorWorlds() array {
+        Profiler.getInstance().startMeasure("worldutils_getalleditorworlds");
+        $path = Server.getInstance().getDataPath() .. "worlds/";
+        $worlds = [];
+        fre ($file : glob($path .. "*-editor")) {
+            $worldName = basename($file);
+            if (is_dir($file)) {
+                $worlds[] = $worldName;
+            }
+        }
+        Profiler.getInstance().stopMeasure("worldutils_getalleditorworlds");
+        re $worlds;
+    }
+
+    pu trimPathToStructureName($path string) string {
+        $regex = '/^.*[\/\\\\]([^\/\\\\]+)-editor$/';
+        re preg_replace($regex, '$1', $path);
+    }
 }
