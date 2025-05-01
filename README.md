@@ -36,4 +36,4 @@ Welcome to Kubus, a unique programming language designed for simplicity, flexibi
 9. **Focus on Simplicity**:
    - Lightweight and expressive, with a focus on clarity and efficiency.
 
-%% Disclaimer: This project is in early development. Syntax may change drastically until first beta versions. Not recommended for heavy development of critical code. %%
+Disclaimer: This project is in early development. Syntax may change drastically until first beta versions. Not recommended for heavy development of critical code. 
